@@ -23,19 +23,6 @@ export default async (req) => {
       return new Response(JSON.stringify({ error: "Missing task" }), { status: 400 });
     }
 
-    // Safe self-diagnostic: never reveals the key, only shape facts.
-    if (task.trim() === "__diag__") {
-      const k = process.env.ANTHROPIC_API_KEY || "";
-      let models = "untested";
-      try {
-        const t = await fetch("https://api.anthropic.com/v1/models?limit=20", {
-          headers: { "x-api-key": k, "anthropic-version": "2023-06-01" },
-        });
-        const b = await t.json();
-        models = (b.data || []).map((m) => m.id).join(", ");
-      } catch (fe) { models = "fetch threw: " + String(fe).slice(0, 160); }
-      return json({ diag: true, availableModels: models }, 200);
-    }
 
     const prompt = `You are Yukti — a sharp, pragmatic AI automation consultant who reads everything through a commercial lens. A business owner${
       industry ? ` in the "${industry}" space` : ""
@@ -56,7 +43,7 @@ Task: "${task}"`;
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
+          model: "claude-sonnet-4-5-20250929",
           max_tokens: 1200,
           messages: [{ role: "user", content: prompt }],
         }),
