@@ -23,6 +23,27 @@ export default async (req) => {
       return new Response(JSON.stringify({ error: "Missing task" }), { status: 400 });
     }
 
+    // Safe self-diagnostic: never reveals the key, only shape facts.
+    if (task.trim() === "__diag__") {
+      const k = process.env.ANTHROPIC_API_KEY || "";
+      let reach = "untested";
+      try {
+        const t = await fetch("https://api.anthropic.com/v1/models", {
+          headers: { "x-api-key": k, "anthropic-version": "2023-06-01" },
+        });
+        reach = "status " + t.status;
+      } catch (fe) { reach = "fetch threw: " + String(fe).slice(0, 120); }
+      return json({
+        diag: true,
+        keyPresent: !!k,
+        keyLength: k.length,
+        keyPrefix: k.slice(0, 7),
+        keyHasWhitespace: /\s/.test(k),
+        anthropicModelsReach: reach,
+        runtime: typeof EdgeRuntime !== "undefined" ? "edge" : "node",
+      }, 200);
+    }
+
     const prompt = `You are Yukti — a sharp, pragmatic AI automation consultant who reads everything through a commercial lens. A business owner${
       industry ? ` in the "${industry}" space` : ""
     } describes a recurring task that eats their time. Assess it honestly and make them feel the cost of the status quo and the upside of fixing it. Be specific, concrete, and confident — no hedging, no fluff, no jargon.
