@@ -21,6 +21,51 @@ const SERVICES = [
     long: "We see the work through. The solution is built, deployed inside your real operations, and your team is trained to use it with confidence — and we stay close while it beds in. A tool nobody adopts is just an expense, so adoption is what we set out to deliver." },
 ];
 
+const INDUSTRIES_DEEP = [
+  { key: "dental", t: "Dental & Healthcare", c: "var(--aqua)", icon: "\u25C8",
+    tag: "Showcase vertical",
+    short: "Front desks drowning in calls, reminders, and no-shows.",
+    pains: [
+      "Missed calls = lost patients. Every unanswered ring is a booking that walks to a competitor.",
+      "No-shows leave chairs empty \u2014 pure lost revenue.",
+      "Front desk buried in reminders, rescheduling, and the same insurance questions all day.",
+      "Patients overdue for recalls slip through the cracks.",
+    ],
+    systems: [
+      ["AI front-desk receptionist", "Answers every call 24/7 \u2014 books, reschedules, answers FAQs, routes emergencies."],
+      ["WhatsApp / SMS auto-reply", "Instant replies and booking links so after-hours leads never go cold."],
+      ["Smart reminders", "Automated reminders + one-tap reschedule that quietly kill no-shows."],
+      ["Review engine", "Nudges happy patients to leave Google reviews \u2014 lifting local search."],
+      ["Recall / reactivation", "Auto-nudges overdue patients back into the chair."],
+    ],
+    proof: "If this captures just two extra patients a month at $500+ each, it has already paid for itself many times over." },
+  { key: "prof", t: "Professional Services", c: "var(--violet)",
+    short: "Law, accounting, consulting \u2014 repetitive intake and drafting.",
+    pains: ["Re-typing client intake into three systems by hand.", "Drafting the same proposal and document sections every time.", "Chasing clients for documents over email."],
+    systems: [["Intake automation", "Capture once, populate CRM, billing, and forms automatically."], ["Document drafting", "Generate first-draft proposals, letters, and reports from a prompt."], ["Follow-up engine", "Automated, polite chasing for documents and signatures."]],
+    proof: "Hours of billable time returned every week, with nothing leaving your walls when privacy matters." },
+  { key: "realestate", t: "Real Estate", c: "var(--pink)",
+    short: "Leads going cold and listings written by hand.",
+    pains: ["Writing every listing description from scratch.", "Following up with each new lead one at a time.", "Coordinating showings over scattered texts and email."],
+    systems: [["Lead responder", "Instant reply to every inquiry, qualifying and booking showings."], ["Listing writer", "Polished descriptions generated from the details in seconds."], ["Showing coordinator", "Automated scheduling across buyers and sellers."]],
+    proof: "More leads worked, faster \u2014 the speed-to-lead edge that wins deals." },
+  { key: "hospitality", t: "Hospitality", c: "var(--amber)",
+    short: "Bookings and guest questions across every channel.",
+    pains: ["Booking and availability questions across email, phone, and DMs.", "Building guest itineraries manually.", "Collecting and responding to reviews."],
+    systems: [["Omni-channel booking bot", "One AI answering bookings everywhere guests reach out."], ["Itinerary builder", "Personalized guest plans generated automatically."], ["Review management", "Collect, respond to, and learn from reviews on autopilot."]],
+    proof: "A front desk that never sleeps, across every channel guests use." },
+  { key: "trades", t: "Trades & Home Services", c: "var(--aqua)",
+    short: "Quotes, scheduling, and unpaid invoices over text.",
+    pains: ["Back-and-forth over text to quote and book jobs.", "Writing up estimates after each site visit.", "Chasing unpaid invoices."],
+    systems: [["Quote & booking bot", "Captures job details, books visits, and follows up automatically."], ["Estimate drafter", "Turns site notes into a clean estimate in minutes."], ["Invoice chaser", "Polite automated reminders until you get paid."]],
+    proof: "More jobs booked, fewer evenings lost to admin and chasing money." },
+  { key: "ecom", t: "E-commerce & Retail", c: "var(--violet)",
+    short: "Support tickets and product copy that never end.",
+    pains: ["Answering the same shipping and returns questions all day.", "Writing product descriptions one by one.", "Tagging and categorizing new inventory."],
+    systems: [["Support AI", "Handles shipping, returns, and order questions instantly."], ["Product copywriter", "Generates descriptions and metadata at scale."], ["Auto-tagging", "Categorizes and tags inventory as it lands."]],
+    proof: "Support handled and catalogs built without adding headcount." },
+];
+
 const PROCESS = [
   { n: "i", t: "Discover", d: "We learn your operations, goals, and constraints — and find where AI is worth your attention." },
   { n: "ii", t: "Prioritize", d: "We rank opportunities by impact and effort, so the first move is the highest-leverage one." },
@@ -78,6 +123,7 @@ function Modal({ open, onClose, children, wide }) {
 
 export default function Yukti() {
   const [expandedSvc, setExpandedSvc] = useState(null);
+  const [openIndustry, setOpenIndustry] = useState(null);
   const [bookOpen, setBookOpen] = useState(false);
   const [bookEmail, setBookEmail] = useState("");
   const [bookMsg, setBookMsg] = useState("");
@@ -201,6 +247,7 @@ export default function Yukti() {
               <a className="nl" href="#why" style={{ color: "var(--ink)", textDecoration: "none", fontSize: ".9rem", fontWeight: 500, opacity: .78 }}>Why now</a>
               <a className="nl" href="#demo" style={{ color: "var(--ink)", textDecoration: "none", fontSize: ".9rem", fontWeight: 500, opacity: .78 }}>Live demo</a>
               <a className="nl" href="#services" style={{ color: "var(--ink)", textDecoration: "none", fontSize: ".9rem", fontWeight: 500, opacity: .78 }}>What we do</a>
+              <a className="nl" href="#industries" style={{ color: "var(--ink)", textDecoration: "none", fontSize: ".9rem", fontWeight: 500, opacity: .78 }}>Industries</a>
               <button className="btn" onClick={() => setBookOpen(true)}>Book a call</button>
             </div>
           </div>
@@ -378,6 +425,64 @@ export default function Yukti() {
           </div>
         </section>
 
+        {/* INDUSTRIES WE SERVE */}
+        <section id="industries" className="wrap" style={{ padding: "60px 0" }}>
+          <div className="eyebrow reveal">Industries we serve</div>
+          <h2 className="reveal" style={{ maxWidth: "22ch" }}>Built for your world — <em>not a generic playbook.</em></h2>
+          <p className="lead reveal" style={{ maxWidth: "56ch", marginBottom: 28 }}>We work across industries, but we go deep on the ones we know best. Open any one to see the exact systems we'd build.</p>
+          <div className="svc" style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 18 }}>
+            {INDUSTRIES_DEEP.map((ind, i) => {
+              const open = openIndustry === i;
+              return (
+                <div key={ind.key} className="glass reveal" onClick={() => setOpenIndustry(open ? null : i)}
+                  style={{ borderRadius: 24, padding: 32, position: "relative", overflow: "hidden", cursor: "pointer",
+                    transition: "box-shadow .3s, transform .3s", boxShadow: open ? "0 22px 50px rgba(22,22,29,.15)" : undefined,
+                    gridColumn: open ? "1 / -1" : "auto" }}>
+                  <span style={{ position: "absolute", width: 150, height: 150, borderRadius: "50%", filter: "blur(48px)", top: -36, right: -36, opacity: open ? .7 : .45, background: ind.c, transition: "opacity .3s" }} />
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <h3 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-.02em" }}>{ind.t}</h3>
+                    {ind.tag && <span className="mono" style={{ fontSize: ".58rem", letterSpacing: ".08em", textTransform: "uppercase", color: "#fff", background: "linear-gradient(135deg,var(--violet),var(--pink))", borderRadius: 30, padding: "5px 10px" }}>{ind.tag}</span>}
+                  </div>
+                  <p style={{ color: "var(--muted)", position: "relative", marginTop: 8 }}>{ind.short}</p>
+                  <div style={{ position: "relative", display: "grid", gridTemplateRows: open ? "1fr" : "0fr", transition: "grid-template-rows .45s cubic-bezier(.2,.8,.2,1)" }}>
+                    <div style={{ overflow: "hidden" }}>
+                      <div style={{ paddingTop: 22, marginTop: 22, borderTop: "1px solid var(--line)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }} className="demoGrid">
+                        <div>
+                          <div className="mono" style={{ fontSize: ".62rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>The pain</div>
+                          {ind.pains.map((p, j) => (
+                            <div key={j} style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                              <span style={{ color: ind.c, marginTop: 2 }}>→</span>
+                              <span style={{ fontSize: ".98rem", color: "var(--ink)", lineHeight: 1.5 }}>{p}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div>
+                          <div className="mono" style={{ fontSize: ".62rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>What we'd build</div>
+                          {ind.systems.map((s, j) => (
+                            <div key={j} style={{ marginBottom: 14 }}>
+                              <div style={{ fontWeight: 600, fontSize: ".98rem" }}>{s[0]}</div>
+                              <div style={{ color: "var(--muted)", fontSize: ".88rem", lineHeight: 1.5 }}>{s[1]}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 8, padding: "16px 18px", borderRadius: 14, background: "linear-gradient(135deg,rgba(109,93,252,.1),rgba(255,93,143,.07))", border: "1px solid var(--line)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <span style={{ color: ind.c, marginTop: 1 }}>◆</span>
+                        <div style={{ fontSize: ".96rem", color: "var(--ink)", lineHeight: 1.55 }}>{ind.proof}</div>
+                      </div>
+                      <button className="btn" style={{ marginTop: 18 }} onClick={(e) => { e.stopPropagation(); setBookOpen(true); }}>Book a call about {ind.t} →</button>
+                    </div>
+                  </div>
+                  <div className="mono" style={{ fontSize: ".72rem", color: ind.c, marginTop: 16, position: "relative", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                    {open ? "Show less" : "See what we'd build"}
+                    <span style={{ display: "inline-block", transition: "transform .35s", transform: open ? "rotate(180deg)" : "none" }}>↓</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* WHY US */}
         <section id="about" className="wrap" style={{ padding: "60px 0" }}>
           <div className="glass reveal" style={{ borderRadius: 34, padding: "clamp(40px,5vw,68px)", position: "relative", overflow: "hidden", background: `rgba(${T.dark},.9)`, color: "#f2f2f7", border: "1px solid rgba(255,255,255,.12)" }}>
@@ -451,12 +556,13 @@ export default function Yukti() {
         <input value={bookEmail} onChange={(e) => setBookEmail(e.target.value)} type="email" placeholder="you@company.com" style={{ width: "100%", borderRadius: 14, border: "1px solid var(--glass-bd)", background: "rgba(255,255,255,.6)", padding: "14px 16px", fontFamily: "inherit", fontSize: "1rem", marginBottom: 12, outline: "none" }} />
         <textarea value={bookMsg} onChange={(e) => setBookMsg(e.target.value)} placeholder="What does your business do, and what's prompting the interest in AI?" rows={3} style={{ width: "100%", borderRadius: 14, border: "1px solid var(--glass-bd)", background: "rgba(255,255,255,.6)", padding: "14px 16px", fontFamily: "inherit", fontSize: "1rem", marginBottom: 16, outline: "none", resize: "vertical" }} />
         <button className="btn lg" style={{ width: "100%" }} onClick={() => {
-          const subject = encodeURIComponent("Discovery call request — Yukti");
-          const body = encodeURIComponent(`Hi Ravi,\n\nI'd like to book a discovery call.\n\nMy email: ${bookEmail || "(add your email)"}\n\nAbout my business / what's prompting interest in AI:\n${bookMsg || "(add a few details)"}\n\nThanks!`);
-          window.location.href = `mailto:ravitoor@truthtribe.ca?subject=${subject}&body=${body}`;
+          // Prefer real calendar booking; carry context via prefill.
+          const note = encodeURIComponent(`${bookMsg || ""}${bookEmail ? `\n(Email: ${bookEmail})` : ""}`.trim());
+          const cal = `https://calendly.com/truthtribestudio/30min${note ? `?a1=${note}` : ""}`;
+          window.open(cal, "_blank", "noopener");
           setBookOpen(false);
-        }}>Request my call →</button>
-        <p className="mono" style={{ fontSize: ".7rem", color: "var(--muted)", textAlign: "center", marginTop: 14 }}>Opens your email to ravitoor@truthtribe.ca — or write us directly anytime.</p>
+        }}>Pick a time →</button>
+        <p className="mono" style={{ fontSize: ".7rem", color: "var(--muted)", textAlign: "center", marginTop: 14 }}>Opens our live calendar \u2014 or email ravitoor@truthtribe.ca anytime.</p>
       </Modal>
     </div>
   );
