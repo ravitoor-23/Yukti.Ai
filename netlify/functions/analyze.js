@@ -26,20 +26,22 @@ export default async (req) => {
     // Safe self-diagnostic: never reveals the key, only shape facts.
     if (task.trim() === "__diag__") {
       const k = process.env.ANTHROPIC_API_KEY || "";
-      let reach = "untested";
+      let msgReach = "untested";
       try {
-        const t = await fetch("https://api.anthropic.com/v1/models", {
-          headers: { "x-api-key": k, "anthropic-version": "2023-06-01" },
+        const t = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": k, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "claude-3-5-sonnet-20241022", max_tokens: 64, messages: [{ role: "user", content: "Say OK" }] }),
         });
-        reach = "status " + t.status;
-      } catch (fe) { reach = "fetch threw: " + String(fe).slice(0, 120); }
+        const b = await t.text();
+        msgReach = "status " + t.status + " body: " + b.slice(0, 220);
+      } catch (fe) { msgReach = "fetch threw: " + String(fe).slice(0, 160); }
       return json({
         diag: true,
         keyPresent: !!k,
         keyLength: k.length,
         keyPrefix: k.slice(0, 7),
-        keyHasWhitespace: /\s/.test(k),
-        anthropicModelsReach: reach,
+        anthropicMessagesReach: msgReach,
         runtime: typeof EdgeRuntime !== "undefined" ? "edge" : "node",
       }, 200);
     }
