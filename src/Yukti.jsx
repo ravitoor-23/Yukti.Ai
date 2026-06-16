@@ -100,6 +100,40 @@ function CountUp({ end, suffix = "%", dur = 1400 }) {
   return <span ref={ref}>{val}{suffix}</span>;
 }
 
+// ---------- result count-up (fires when result lands) ----------
+function ResultNum({ end, prefix = "", suffix = "", dur = 1100 }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    let raf; const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min((t - t0) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(eased * end));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [end, dur]);
+  return <span>{prefix}{val.toLocaleString()}{suffix}</span>;
+}
+
+// ---------- typewriter (the AI "writes" its verdict) ----------
+function Typewriter({ text, speed = 22 }) {
+  const [out, setOut] = useState("");
+  useEffect(() => {
+    setOut("");
+    if (!text) return;
+    let i = 0; let id;
+    const tick = () => {
+      i++; setOut(text.slice(0, i));
+      if (i < text.length) id = setTimeout(tick, speed);
+    };
+    id = setTimeout(tick, speed);
+    return () => clearTimeout(id);
+  }, [text, speed]);
+  return <span>{out}<span style={{ opacity: out.length < (text || "").length ? 1 : 0, color: "var(--aqua)" }}>▋</span></span>;
+}
+
 // ---------- modal ----------
 function Modal({ open, onClose, children, wide }) {
   useEffect(() => {
@@ -176,8 +210,8 @@ export default function Yukti() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ industry, task: t }),
       });
-      if (!r.ok) throw new Error("bad response");
       const parsed = await r.json();
+      if (!r.ok || parsed.error) throw new Error(parsed.error || "bad response");
       setResult(parsed);
     } catch (e) {
       setErr("The demo hit a snag — give it another go in a moment.");
@@ -348,6 +382,17 @@ export default function Yukti() {
                   {!busy && !result && !err && <div style={{ color: "#9494a6" }} className="mono">Your AI analysis will appear here →</div>}
                   {result && !busy && (
                     <div style={{ animation: "pop .4s ease" }}>
+                      {result.verdict && (
+                        <div style={{ marginBottom: 18, paddingBottom: 18, borderBottom: "1px solid rgba(255,255,255,.12)" }}>
+                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--pink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                            The verdict
+                            {(result.impact === "High" || result.impact === "high") && (
+                              <span style={{ color: "#fff", background: "linear-gradient(135deg,var(--pink),var(--amber))", borderRadius: 30, padding: "3px 9px", fontSize: ".56rem", letterSpacing: ".06em" }}>🔥 HIGH IMPACT</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1.18 }}><Typewriter text={result.verdict} /></div>
+                        </div>
+                      )}
                       <div className="mono" style={{ fontSize: ".64rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 8 }}>The opportunity</div>
                       <div style={{ fontSize: "1.22rem", fontWeight: 600, letterSpacing: "-.01em", marginBottom: 20, lineHeight: 1.3 }}>{result.opportunity}</div>
 
@@ -367,11 +412,11 @@ export default function Yukti() {
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
                         <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,.06)" }}>
-                          <div style={{ fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1 }}>~{result.hoursPerWeek}<span style={{ fontSize: "1rem", color: "#9494a6" }}> hrs/wk</span></div>
+                          <div style={{ fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1 }}>~<ResultNum end={Number(result.hoursPerWeek) || 0} /><span style={{ fontSize: "1rem", color: "#9494a6" }}> hrs/wk</span></div>
                           <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".06em", textTransform: "uppercase", color: "#9494a6", marginTop: 6 }}>Time recovered</div>
                         </div>
-                        <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,.06)" }}>
-                          <div style={{ fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1 }}>~${result.dollarsPerMonth}<span style={{ fontSize: "1rem", color: "#9494a6" }}>/mo</span></div>
+                        <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(47,214,201,.08)", border: "1px solid rgba(47,214,201,.2)" }}>
+                          <div style={{ fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1, color: "var(--aqua)" }}><ResultNum end={Number(result.dollarsPerMonth) || 0} prefix="~$" /><span style={{ fontSize: "1rem", color: "#9494a6" }}>/mo</span></div>
                           <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".06em", textTransform: "uppercase", color: "#9494a6", marginTop: 6 }}>Value of that time</div>
                         </div>
                       </div>
@@ -384,6 +429,7 @@ export default function Yukti() {
                         </div>
                       </div>
 
+                      <button className="btn lg" style={{ width: "100%", marginTop: 18 }} onClick={() => setBookOpen(true)}>Want this built? Book a call →</button>
                       <div className="mono" style={{ fontSize: ".58rem", color: "#7a7a8c", marginTop: 14, textAlign: "center" }}>Estimates are directional — a real audit sharpens them.</div>
                     </div>
                   )}
