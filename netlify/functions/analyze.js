@@ -26,24 +26,15 @@ export default async (req) => {
     // Safe self-diagnostic: never reveals the key, only shape facts.
     if (task.trim() === "__diag__") {
       const k = process.env.ANTHROPIC_API_KEY || "";
-      let msgReach = "untested";
+      let models = "untested";
       try {
-        const t = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "x-api-key": k, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "claude-3-5-sonnet-20241022", max_tokens: 64, messages: [{ role: "user", content: "Say OK" }] }),
+        const t = await fetch("https://api.anthropic.com/v1/models?limit=20", {
+          headers: { "x-api-key": k, "anthropic-version": "2023-06-01" },
         });
-        const b = await t.text();
-        msgReach = "status " + t.status + " body: " + b.slice(0, 220);
-      } catch (fe) { msgReach = "fetch threw: " + String(fe).slice(0, 160); }
-      return json({
-        diag: true,
-        keyPresent: !!k,
-        keyLength: k.length,
-        keyPrefix: k.slice(0, 7),
-        anthropicMessagesReach: msgReach,
-        runtime: typeof EdgeRuntime !== "undefined" ? "edge" : "node",
-      }, 200);
+        const b = await t.json();
+        models = (b.data || []).map((m) => m.id).join(", ");
+      } catch (fe) { models = "fetch threw: " + String(fe).slice(0, 160); }
+      return json({ diag: true, availableModels: models }, 200);
     }
 
     const prompt = `You are Yukti — a sharp, pragmatic AI automation consultant who reads everything through a commercial lens. A business owner${
