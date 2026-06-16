@@ -171,12 +171,22 @@ export default function Yukti() {
   };
   const T = THEMES[theme];
 
-  // live AI demo
+  // live AI consultant (conversational interview)
   const [industry, setIndustry] = useState("");
   const [task, setTask] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [err, setErr] = useState("");
+  const [chat, setChat] = useState([]); // [{role:'user'|'assistant', content, question?}]
+  const [started, setStarted] = useState(false);
+  const [progress, setProgress] = useState(8);
+  const [leadName, setLeadName] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadCompany, setLeadCompany] = useState("");
+  const [leadSent, setLeadSent] = useState(false);
+  const [leadBusy, setLeadBusy] = useState(false);
+  const chatEndRef = useRef(null);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chat, busy, result]);
 
   const INDUSTRIES = ["Professional services", "E-commerce / Retail", "Healthcare", "Real estate", "Hospitality", "Trades & home services", "Agency / Marketing", "Other"];
 
@@ -201,24 +211,71 @@ export default function Yukti() {
     "Other": "e.g. We copy the same data between two tools every single day…",
   };
 
-  async function runDemo(presetText) {
-    const t = presetText !== undefined ? presetText : task;
-    if (!t.trim()) return;
-    setBusy(true); setErr(""); setResult(null);
+  async function sendToConsultant(nextMessages) {
+    setBusy(true); setErr("");
     try {
       const r = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ industry, task: t }),
+        body: JSON.stringify({ industry, messages: nextMessages.map((m) => ({ role: m.role, content: m.content })) }),
       });
       const parsed = await r.json();
       if (!r.ok || parsed.error) throw new Error(parsed.error || "bad response");
-      setResult(parsed);
+      if (parsed.phase === "result") {
+        setResult(parsed);
+        setChat((c) => [...c, { role: "assistant", content: parsed.verdict, isResult: true }]);
+        setProgress(100);
+      } else {
+        const txt = [parsed.reply, parsed.question].filter(Boolean).join("\n\n");
+        setChat((c) => [...c, { role: "assistant", content: txt }]);
+        if (parsed.progress) setProgress(Math.max(progress, Math.min(95, parsed.progress)));
+      }
     } catch (e) {
-      setErr("The demo hit a snag — give it another go in a moment.");
+      setErr("The consultant hit a snag — try again in a moment.");
       if (typeof window !== "undefined" && window.location.search.includes("debug")) {
         setErr("DEBUG: " + (e && e.message ? e.message : String(e)));
       }
     } finally { setBusy(false); }
+  }
+
+  function startInterview(presetText) {
+    const t = presetText !== undefined ? presetText : task;
+    if (!t.trim()) return;
+    setStarted(true); setResult(null); setLeadSent(false);
+    const first = [{ role: "user", content: t }];
+    setChat(first); setTask(""); setProgress(15);
+    sendToConsultant(first);
+  }
+
+  function reply() {
+    if (!task.trim() || busy) return;
+    const next = [...chat, { role: "user", content: task }];
+    setChat(next); setTask("");
+    sendToConsultant(next);
+  }
+
+  function resetInterview() {
+    setChat([]); setStarted(false); setResult(null); setErr(""); setProgress(8);
+    setLeadSent(false); setLeadName(""); setLeadEmail(""); setLeadCompany("");
+  }
+
+  async function submitLead() {
+    if (!leadEmail.trim() || leadBusy) return;
+    setLeadBusy(true);
+    const transcript = chat.map((m) => `${m.role === "user" ? "Owner" : "Yukti"}: ${m.content}`).join("\n\n");
+    try {
+      await fetch("/api/lead", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: leadName, email: leadEmail, company: leadCompany, industry,
+          verdict: result?.verdict, summary: result?.summary,
+          hoursPerWeek: result?.hoursPerWeek, dollarsPerMonth: result?.dollarsPerMonth,
+          impact: result?.impact, transcript,
+          page: typeof window !== "undefined" ? window.location.href : "",
+        }),
+      });
+      setLeadSent(true);
+    } catch (e) { setLeadSent(true); /* don't block the user */ }
+    finally { setLeadBusy(false); }
   }
 
   // scroll reveal
@@ -251,6 +308,8 @@ export default function Yukti() {
         @keyframes fade{from{opacity:0}to{opacity:1}}
         @keyframes pop{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+        @keyframes blink{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
         .content{position:relative;z-index:1}
         .wrap{max-width:1080px;margin:0 auto;padding:0 26px}
         .glass{background:var(--glass);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);border:1px solid var(--glass-bd);box-shadow:0 8px 40px rgba(22,22,29,.07),inset 0 1px 0 rgba(255,255,255,.6)}
@@ -269,6 +328,8 @@ export default function Yukti() {
         .chip{cursor:pointer;transition:.3s cubic-bezier(.2,.8,.2,1)}
         .chip:hover{transform:translateY(-6px);box-shadow:0 22px 50px rgba(22,22,29,.14)}
         @media(max-width:780px){.nl{display:none}.svc{grid-template-columns:1fr!important}.steps{grid-template-columns:1fr 1fr!important}.demoGrid{grid-template-columns:1fr!important}.statDiv{width:80px!important;height:1px!important}.whyEvidence{flex-direction:column!important}.whyEvidence>div{padding:24px 0!important}.whyEvidence>div[style*="width: 1px"]{width:100%!important;height:1px!important}}
+        @media(max-width:560px){.wrap{padding:0 16px}h1{font-size:clamp(2.3rem,9vw,3rem)}h2{font-size:clamp(1.7rem,7vw,2.2rem)}.lead{font-size:1.02rem}.btn.lg{width:100%;text-align:center}}
+        @media(max-width:560px){input,textarea{font-size:16px}}
       `}</style>
 
       <div className="mesh"><div className="blob b1" /><div className="blob b2" /><div className="blob b3" /><div className="blob b4" /></div>
@@ -336,18 +397,32 @@ export default function Yukti() {
           </div>
         </section>
 
-        {/* LIVE DEMO */}
+        {/* LIVE AI CONSULTANT */}
         <section id="demo" className="wrap" style={{ padding: "60px 0" }}>
-          <div className="glass reveal" style={{ borderRadius: 32, padding: "clamp(32px,5vw,56px)", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", filter: "blur(80px)", opacity: .32, background: "linear-gradient(135deg,var(--violet),var(--aqua))", top: -120, right: -80 }} />
+          <div className="glass reveal" style={{ borderRadius: 32, padding: "clamp(22px,4vw,48px)", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", width: 340, height: 340, borderRadius: "50%", filter: "blur(90px)", opacity: .3, background: "linear-gradient(135deg,var(--violet),var(--aqua))", top: -130, right: -90 }} />
             <div style={{ position: "relative" }}>
-              <div className="eyebrow">Live demo · powered by AI</div>
-              <h2 style={{ maxWidth: "18ch" }}>See it work <em>before you talk to us.</em></h2>
-              <p className="lead" style={{ maxWidth: "58ch", marginBottom: 24 }}>Choose your industry and describe a task that takes up your week. You'll get a real analysis back — the opportunity, how it would work, and what it's worth in hours and dollars.</p>
+              <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--aqua)", boxShadow: "0 0 10px var(--aqua)", animation: "pulse 1.8s ease-in-out infinite" }} />
+                Live AI consultant · talk to it now
+              </div>
+              <h2 style={{ maxWidth: "20ch" }}>Get a free <em>AI strategy session</em> — right now.</h2>
+              <p className="lead" style={{ maxWidth: "60ch", marginBottom: 22 }}>Tell our AI consultant what eats your time. It'll ask a few sharp questions — like a real discovery call — then hand you a tailored plan with the hours and dollars on the line.</p>
 
-              <div className="demoGrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+              {/* progress */}
+              {started && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ height: 6, borderRadius: 10, background: "rgba(22,22,29,.08)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: progress + "%", borderRadius: 10, background: "linear-gradient(90deg,var(--violet),var(--pink),var(--aqua))", transition: "width .6s cubic-bezier(.2,.8,.2,1)" }} />
+                  </div>
+                  <div className="mono" style={{ fontSize: ".6rem", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", marginTop: 7 }}>{progress >= 100 ? "Assessment ready" : "Discovery in progress… " + progress + "%"}</div>
+                </div>
+              )}
+
+              {/* START STATE */}
+              {!started && (
                 <div>
-                  <div className="mono" style={{ fontSize: ".66rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>1 · Your industry</div>
+                  <div className="mono" style={{ fontSize: ".66rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>Your industry (optional)</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
                     {INDUSTRIES.map((ind) => {
                       const on = industry === ind;
@@ -359,85 +434,145 @@ export default function Yukti() {
                       );
                     })}
                   </div>
-                  <div className="mono" style={{ fontSize: ".66rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>2 · The task that eats your time</div>
-                  <textarea value={task} onChange={(e) => setTask(e.target.value)} placeholder={industry ? placeholderByIndustry[industry] : "e.g. We manually answer the same 10 customer questions by email every day…"}
-                    rows={4} style={{ width: "100%", borderRadius: 16, border: "1px solid var(--glass-bd)", background: "rgba(255,255,255,.6)", padding: "16px", fontFamily: "inherit", fontSize: "1rem", color: "var(--ink)", resize: "vertical", outline: "none" }} />
+                  <div className="mono" style={{ fontSize: ".66rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>What's eating your time?</div>
+                  <textarea value={task} onChange={(e) => setTask(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) startInterview(); }}
+                    placeholder={industry ? placeholderByIndustry[industry] : "e.g. We answer the same 10 customer questions by phone and email all day…"}
+                    rows={3} style={{ width: "100%", borderRadius: 16, border: "1px solid var(--glass-bd)", background: "rgba(255,255,255,.6)", padding: "16px", fontFamily: "inherit", fontSize: "1rem", color: "var(--ink)", resize: "vertical", outline: "none" }} />
                   {industry && (
                     <div style={{ marginTop: 12 }}>
                       <div className="mono" style={{ fontSize: ".6rem", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8, opacity: .8 }}>Or start from a common one ↓</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {(suggestionsByIndustry[industry] || []).map((sug, i) => (
-                          <button key={i} onClick={() => setTask(sug)} className="mono"
+                          <button key={i} onClick={() => startInterview(sug)} className="mono"
                             style={{ fontSize: ".72rem", color: "var(--ink)", background: "rgba(255,255,255,.5)", border: "1px solid var(--line)", borderRadius: 30, padding: "7px 12px", cursor: "pointer", transition: ".2s", textAlign: "left" }}>{sug}</button>
                         ))}
                       </div>
                     </div>
                   )}
-                  <button className="btn lg" onClick={() => runDemo()} disabled={busy} style={{ marginTop: 16, opacity: busy ? .7 : 1 }}>
-                    {busy ? "Analyzing…" : "Analyze this task →"}
+                  <button className="btn lg" onClick={() => startInterview()} disabled={busy || !task.trim()} style={{ marginTop: 16, opacity: (busy || !task.trim()) ? .55 : 1 }}>
+                    Start my free AI session →
                   </button>
                 </div>
+              )}
 
-                <div className="glass" style={{ borderRadius: 20, padding: 28, minHeight: 320, display: "flex", flexDirection: "column", justifyContent: "center", background: `rgba(${T.dark},.92)`, color: "#f2f2f7" }}>
-                  {busy && <div style={{ display: "flex", alignItems: "center", gap: 12, color: "#c8c8d4" }}>
-                    <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid rgba(255,255,255,.3)", borderTopColor: "var(--aqua)", animation: "spin .8s linear infinite" }} />Thinking it through…</div>}
-                  {err && !busy && <div style={{ color: "var(--pink)" }}>{err}</div>}
-                  {!busy && !result && !err && <div style={{ color: "#9494a6" }} className="mono">Your AI analysis will appear here →</div>}
-                  {result && !busy && (
-                    <div style={{ animation: "pop .4s ease" }}>
-                      {result.verdict && (
-                        <div style={{ marginBottom: 18, paddingBottom: 18, borderBottom: "1px solid rgba(255,255,255,.12)" }}>
-                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--pink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-                            The verdict
-                            {(result.impact === "High" || result.impact === "high") && (
-                              <span style={{ color: "#fff", background: "linear-gradient(135deg,var(--pink),var(--amber))", borderRadius: 30, padding: "3px 9px", fontSize: ".56rem", letterSpacing: ".06em" }}>🔥 HIGH IMPACT</span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1.18 }}><Typewriter text={result.verdict} /></div>
+              {/* CHAT STATE */}
+              {started && (
+                <div className="glass" style={{ borderRadius: 22, padding: "clamp(16px,3vw,26px)", background: `rgba(${T.dark},.94)`, color: "#f2f2f7", maxHeight: "60vh", overflowY: "auto" }}>
+                  {chat.map((m, i) => {
+                    if (m.isResult) return null;
+                    const isUser = m.role === "user";
+                    return (
+                      <div key={i} style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 14 }}>
+                        <div style={{ maxWidth: "85%", padding: "12px 16px", borderRadius: 16, fontSize: ".96rem", lineHeight: 1.55, whiteSpace: "pre-wrap",
+                          background: isUser ? "linear-gradient(135deg,var(--violet),var(--pink))" : "rgba(255,255,255,.08)",
+                          color: isUser ? "#fff" : "#e8e8f0", border: isUser ? "none" : "1px solid rgba(255,255,255,.12)",
+                          borderBottomRightRadius: isUser ? 4 : 16, borderBottomLeftRadius: isUser ? 16 : 4 }}>
+                          {!isUser && <span className="mono" style={{ display: "block", fontSize: ".56rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 6 }}>Yukti</span>}
+                          {m.content}
                         </div>
-                      )}
-                      <div className="mono" style={{ fontSize: ".64rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 8 }}>The opportunity</div>
-                      <div style={{ fontSize: "1.22rem", fontWeight: 600, letterSpacing: "-.01em", marginBottom: 20, lineHeight: 1.3 }}>{result.opportunity}</div>
+                      </div>
+                    );
+                  })}
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                  {busy && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#9494a6", marginBottom: 14 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--aqua)", animation: "blink 1.2s infinite" }} />
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--aqua)", animation: "blink 1.2s .2s infinite" }} />
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--aqua)", animation: "blink 1.2s .4s infinite" }} />
+                    </div>
+                  )}
+
+                  {err && !busy && <div style={{ color: "var(--pink)", marginBottom: 12 }}>{err}</div>}
+
+                  {/* RESULT CARD */}
+                  {result && !busy && (
+                    <div style={{ animation: "pop .4s ease", marginTop: 4 }}>
+                      <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid rgba(255,255,255,.12)" }}>
+                        <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--pink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          Your verdict
+                          {(result.impact === "High" || result.impact === "high") && (
+                            <span style={{ color: "#fff", background: "linear-gradient(135deg,var(--pink),var(--amber))", borderRadius: 30, padding: "3px 9px", fontSize: ".56rem", letterSpacing: ".06em" }}>🔥 HIGH IMPACT</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "clamp(1.3rem,3.5vw,1.6rem)", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1.18 }}><Typewriter text={result.verdict} /></div>
+                      </div>
+                      <div className="mono" style={{ fontSize: ".62rem", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 8 }}>The opportunity</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: 18, lineHeight: 1.35 }}>{result.opportunity}</div>
+
+                      <div className="demoGrid" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
                         <div style={{ flex: 1, padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)" }}>
-                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".08em", textTransform: "uppercase", color: "#9494a6", marginBottom: 4 }}>Today</div>
+                          <div className="mono" style={{ fontSize: ".56rem", letterSpacing: ".08em", textTransform: "uppercase", color: "#9494a6", marginBottom: 4 }}>Today</div>
                           <div style={{ fontSize: ".88rem", color: "#e0e0e8" }}>{result.before}</div>
                         </div>
                         <span style={{ color: "var(--aqua)", fontSize: "1.2rem" }}>→</span>
                         <div style={{ flex: 1, padding: "12px 14px", borderRadius: 12, background: "rgba(47,214,201,.10)", border: "1px solid rgba(47,214,201,.3)" }}>
-                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 4 }}>With AI</div>
+                          <div className="mono" style={{ fontSize: ".56rem", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 4 }}>With AI</div>
                           <div style={{ fontSize: ".88rem", color: "#e0e0e8" }}>{result.after}</div>
                         </div>
                       </div>
 
-                      <div style={{ color: "#c8c8d4", fontSize: ".96rem", marginBottom: 20, lineHeight: 1.55 }}>{result.approach}</div>
+                      <div style={{ color: "#c8c8d4", fontSize: ".95rem", marginBottom: 18, lineHeight: 1.55 }}>{result.approach}</div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                         <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(255,255,255,.06)" }}>
-                          <div style={{ fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1 }}>~<ResultNum end={Number(result.hoursPerWeek) || 0} /><span style={{ fontSize: "1rem", color: "#9494a6" }}> hrs/wk</span></div>
-                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".06em", textTransform: "uppercase", color: "#9494a6", marginTop: 6 }}>Time recovered</div>
+                          <div style={{ fontSize: "1.6rem", fontWeight: 700, lineHeight: 1 }}>~<ResultNum end={Number(result.hoursPerWeek) || 0} /><span style={{ fontSize: "1rem", color: "#9494a6" }}> hrs/wk</span></div>
+                          <div className="mono" style={{ fontSize: ".56rem", letterSpacing: ".06em", textTransform: "uppercase", color: "#9494a6", marginTop: 6 }}>Time recovered</div>
                         </div>
                         <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(47,214,201,.08)", border: "1px solid rgba(47,214,201,.2)" }}>
-                          <div style={{ fontSize: "1.6rem", fontWeight: 700, letterSpacing: "-.02em", lineHeight: 1, color: "var(--aqua)" }}><ResultNum end={Number(result.dollarsPerMonth) || 0} prefix="~$" /><span style={{ fontSize: "1rem", color: "#9494a6" }}>/mo</span></div>
-                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".06em", textTransform: "uppercase", color: "#9494a6", marginTop: 6 }}>Value of that time</div>
+                          <div style={{ fontSize: "1.6rem", fontWeight: 700, lineHeight: 1, color: "var(--aqua)" }}><ResultNum end={Number(result.dollarsPerMonth) || 0} prefix="~$" /><span style={{ fontSize: "1rem", color: "#9494a6" }}>/mo</span></div>
+                          <div className="mono" style={{ fontSize: ".56rem", letterSpacing: ".06em", textTransform: "uppercase", color: "#9494a6", marginTop: 6 }}>Value of that time</div>
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg,rgba(109,93,252,.15),rgba(255,93,143,.1))", border: "1px solid rgba(255,255,255,.12)" }}>
-                        <span style={{ color: "var(--aqua)", fontSize: ".9rem", marginTop: 1 }}>◆</span>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "14px 16px", borderRadius: 12, marginBottom: 18, background: "linear-gradient(135deg,rgba(109,93,252,.15),rgba(255,93,143,.1))", border: "1px solid rgba(255,255,255,.12)" }}>
+                        <span style={{ color: "var(--aqua)", marginTop: 1 }}>◆</span>
                         <div>
-                          <div className="mono" style={{ fontSize: ".58rem", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 4 }}>First step · {result.difficulty} effort</div>
+                          <div className="mono" style={{ fontSize: ".56rem", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--aqua)", marginBottom: 4 }}>First step · {result.difficulty} effort</div>
                           <div style={{ fontSize: ".9rem", color: "#e8e8f0" }}>{result.firstStep}</div>
                         </div>
                       </div>
 
-                      <button className="btn lg" style={{ width: "100%", marginTop: 18 }} onClick={() => setBookOpen(true)}>Want this built? Book a call →</button>
-                      <div className="mono" style={{ fontSize: ".58rem", color: "#7a7a8c", marginTop: 14, textAlign: "center" }}>Estimates are directional — a real audit sharpens them.</div>
+                      {/* LEAD CAPTURE */}
+                      {!leadSent ? (
+                        <div style={{ padding: "18px", borderRadius: 16, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.14)" }}>
+                          <div style={{ fontWeight: 700, fontSize: "1.05rem", marginBottom: 4 }}>Want this built for you?</div>
+                          <div style={{ color: "#b6b6c4", fontSize: ".88rem", marginBottom: 14 }}>Drop your details and Ravi will personally send you a tailored plan + book a time.</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }} className="demoGrid">
+                            <input value={leadName} onChange={(e) => setLeadName(e.target.value)} placeholder="Your name" style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", padding: "12px 14px", fontFamily: "inherit", fontSize: ".95rem", color: "#fff", outline: "none" }} />
+                            <input value={leadCompany} onChange={(e) => setLeadCompany(e.target.value)} placeholder="Business name" style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", padding: "12px 14px", fontFamily: "inherit", fontSize: ".95rem", color: "#fff", outline: "none" }} />
+                          </div>
+                          <input value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} type="email" placeholder="you@business.com" style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", padding: "12px 14px", fontFamily: "inherit", fontSize: ".95rem", color: "#fff", outline: "none", marginBottom: 12 }} />
+                          <button className="btn lg" style={{ width: "100%", opacity: (!leadEmail.trim() || leadBusy) ? .55 : 1 }} disabled={!leadEmail.trim() || leadBusy} onClick={submitLead}>
+                            {leadBusy ? "Sending…" : "Send me the plan →"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ padding: "18px", borderRadius: 16, background: "rgba(47,214,201,.1)", border: "1px solid rgba(47,214,201,.3)", textAlign: "center" }}>
+                          <div style={{ fontWeight: 700, fontSize: "1.1rem", marginBottom: 6 }}>✓ Got it — talk soon!</div>
+                          <div style={{ color: "#b6b6c4", fontSize: ".9rem", marginBottom: 14 }}>Your plan is on its way. Want to skip the wait? Grab a time now.</div>
+                          <button className="btn lg" onClick={() => setBookOpen(true)}>Book a call now →</button>
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 16 }}>
+                        <button onClick={resetInterview} className="mono" style={{ background: "none", border: "none", color: "#9494a6", cursor: "pointer", fontSize: ".72rem", textDecoration: "underline" }}>↺ Start over</button>
+                      </div>
                     </div>
                   )}
+
+                  {/* REPLY INPUT (during interview) */}
+                  {!result && !busy && (
+                    <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                      <input value={task} onChange={(e) => setTask(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); reply(); } }}
+                        placeholder="Type your answer…" autoFocus
+                        style={{ flex: 1, borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", padding: "13px 16px", fontFamily: "inherit", fontSize: ".96rem", color: "#fff", outline: "none" }} />
+                      <button className="btn" onClick={reply} disabled={!task.trim()} style={{ opacity: !task.trim() ? .55 : 1 }}>Send</button>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </section>
