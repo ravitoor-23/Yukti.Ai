@@ -2,7 +2,10 @@
 // Conversational AI consultant. Multi-turn: asks smart follow-ups like a real
 // discovery call, then delivers a final assessment. Key stays server-side.
 
+// Sonnet for the final assessment (quality matters); Haiku for cheap interview turns.
 const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL_INTERVIEW = "claude-haiku-4-5-20251001";
+const MAX_TURNS = 5; // hard cap so a runaway chat can't rack up cost
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
@@ -43,8 +46,21 @@ export default async (req) => {
       return json({ error: "Missing messages" }, 400);
     }
 
+    // Cost guard: count how many turns the user has taken.
+    const userTurns = messages.filter((m) => m.role === "user").length;
+    // After MAX_TURNS, force the model to conclude with a result (no more questions).
+    const forceResult = userTurns >= MAX_TURNS;
+    // Use the cheap model while interviewing; use Sonnet for the final assessment turn.
+    const useModel = forceResult ? MODEL : (userTurns >= 3 ? MODEL : MODEL_INTERVIEW);
+
     // messages: [{role:'user'|'assistant', content:'...'}]
-    const sys = SYSTEM + (industry ? `\n\nThe business is in the "${industry}" space.` : "");
+    // Prompt caching: the big static SYSTEM doctrine is marked cacheable so it's
+    // billed once and re-read cheaply on every follow-up turn. The tiny dynamic
+    // industry line is a separate, uncached block.
+    const sys = [
+      { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
+    ];
+    if (industry) sys.push({ type: "text", text: `The business is in the "${industry}" space.` });
 
     let r;
     try {
@@ -55,10 +71,13 @@ export default async (req) => {
           "x-api-key": process.env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
         },
+        // (prompt-caching is GA; no beta header needed)
         body: JSON.stringify({
-          model: MODEL,
+          model: useModel,
           max_tokens: 1100,
-          system: sys,
+          system: forceResult
+            ? [{ type: "text", text: SYSTEM + "\n\nYou have gathered enough. Respond now with a phase:\"result\" JSON — do not ask another question.", cache_control: { type: "ephemeral" } }, ...(industry ? [{ type: "text", text: `The business is in the "${industry}" space.` }] : [])]
+            : sys,
           messages: messages.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "").slice(0, 4000) })),
         }),
       });
