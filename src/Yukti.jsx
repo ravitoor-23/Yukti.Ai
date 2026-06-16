@@ -558,7 +558,7 @@ export default function Yukti() {
         <button className="btn lg" style={{ width: "100%" }} onClick={() => {
           // Prefer real calendar booking; carry context via prefill.
           const note = encodeURIComponent(`${bookMsg || ""}${bookEmail ? `\n(Email: ${bookEmail})` : ""}`.trim());
-          const cal = `https://calendly.com/truthtribestudio/30min${note ? `?a1=${note}` : ""}`;
+          const cal = `https://calendly.com/truthtribestudio/truth-tribe-podcast${note ? `?a1=${note}` : ""}`;
           window.open(cal, "_blank", "noopener");
           setBookOpen(false);
         }}>Pick a time →</button>
