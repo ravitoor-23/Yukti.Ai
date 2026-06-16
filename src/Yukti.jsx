@@ -215,6 +215,9 @@ export default function Yukti() {
       setResult(parsed);
     } catch (e) {
       setErr("The demo hit a snag — give it another go in a moment.");
+      if (typeof window !== "undefined" && window.location.search.includes("debug")) {
+        setErr("DEBUG: " + (e && e.message ? e.message : String(e)));
+      }
     } finally { setBusy(false); }
   }
 

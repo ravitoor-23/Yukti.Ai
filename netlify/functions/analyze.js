@@ -1,6 +1,9 @@
 // Netlify serverless function: /api/analyze
 // Holds your secret API key server-side so it's never exposed to visitors.
 
+const json = (obj, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
+
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -29,45 +32,45 @@ Respond ONLY with valid JSON — no markdown, no preamble, no backticks. Use thi
 
 Task: "${task}"`;
 
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1200,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!r.ok) {
-      const detail = await r.text().catch(() => "");
-      return new Response(JSON.stringify({ error: "Upstream error", status: r.status, detail: detail.slice(0, 300) }), {
-        status: 502,
-        headers: { "Content-Type": "application/json" },
+    let r;
+    try {
+      r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 1200,
+          messages: [{ role: "user", content: prompt }],
+        }),
       });
+    } catch (fe) {
+      return json({ error: "Could not reach the AI service", message: String(fe).slice(0, 200) }, 502);
     }
 
-    const data = await r.json();
+    const raw = await r.text().catch(() => "");
+    if (!r.ok) {
+      return json({ error: "Upstream error", status: r.status, detail: raw.slice(0, 400) }, 502);
+    }
+
+    let data;
+    try { data = JSON.parse(raw); } catch { return json({ error: "Bad upstream JSON", detail: raw.slice(0, 300) }, 502); }
+
     const text = (data.content || [])
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("");
 
-    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+    let parsed;
+    try { parsed = JSON.parse(text.replace(/```json|```/g, "").trim()); }
+    catch { return json({ error: "Could not parse AI output", detail: text.slice(0, 300) }, 502); }
 
-    return new Response(JSON.stringify(parsed), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json(parsed, 200);
   } catch (e) {
-    return new Response(JSON.stringify({ error: "Analysis failed", message: String(e).slice(0, 200) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "Analysis failed", message: String(e).slice(0, 200) }, 500);
   }
 };
 
